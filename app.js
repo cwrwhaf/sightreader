@@ -37,8 +37,17 @@ let microphone = null;
 let isListening = false;
 let detectionInterval = null;
 
+// Rendering state (persistent)
+let renderer = null;
+let context = null;
+let trebleStave = null;
+let bassStave = null;
+let stavesChildCount = 0; // Number of SVG children after drawing staves
+let targetNoteChildCount = 0; // Number of SVG children after drawing target note
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    initializeStaves();
     generateNewNote();
 
     document.getElementById('startBtn').addEventListener('click', toggleListening);
@@ -50,37 +59,65 @@ function getNoteClef(octave) {
     return octave <= 3 ? 'bass' : 'treble';
 }
 
-// VexFlow rendering
-function renderNotation(note, detectedNote = null) {
+// Initialize staves once - only called on page load
+function initializeStaves() {
     const notationDiv = document.getElementById('notation');
-    notationDiv.innerHTML = '';
+
+    // Create renderer
+    renderer = new Renderer(notationDiv, Renderer.Backends.SVG);
+    renderer.resize(600, 350);
+    context = renderer.getContext();
 
     try {
-        const renderer = new Renderer(notationDiv, Renderer.Backends.SVG);
-        renderer.resize(700, 350);
-        const context = renderer.getContext();
-
         // Draw treble clef stave
-        const trebleStave = new Stave(10, 40, 300);
+        trebleStave = new Stave(10, 40, 580);
         trebleStave.addClef('treble').setContext(context).draw();
 
         // Draw bass clef stave
-        const bassStave = new Stave(10, 180, 300);
+        bassStave = new Stave(10, 180, 580);
         bassStave.addClef('bass').setContext(context).draw();
 
-        // Draw treble stave for detected note
-        const trebleStave2 = new Stave(350, 40, 300);
-        trebleStave2.addClef('treble').setContext(context).draw();
+        // Add labels
+        context.fillStyle = '#667eea';
+        context.font = 'bold 14px Arial';
+        context.fillText('Target', 20, 25);
 
-        // Draw bass clef stave for detected note
-        const bassStave2 = new Stave(350, 180, 300);
-        bassStave2.addClef('bass').setContext(context).draw();
+        context.fillStyle = '#333';
+        context.fillText('You Played', 200, 25);
 
-        // Determine which stave to use for target note
-        const targetClef = getNoteClef(note.octave);
-        const targetStaveRef = targetClef === 'treble' ? trebleStave : bassStave;
+        // Count SVG children - everything after this is notes that can be cleared
+        const svg = notationDiv.querySelector('svg');
+        if (svg) {
+            stavesChildCount = svg.children.length;
+        }
+    } catch (error) {
+        console.error('Stave initialization error:', error);
+    }
+}
+
+// Render target note only (called once per new target note)
+function renderTargetNote(note) {
+    try {
+        const notationDiv = document.getElementById('notation');
+        const svg = notationDiv.querySelector('svg');
+
+        // Clear only notes (everything after staves), keep staves
+        if (svg) {
+            while (svg.children.length > stavesChildCount) {
+                svg.removeChild(svg.lastChild);
+            }
+        }
+
+        // Create fresh Stave objects for positioning - offset x to start after clef
+        const freshTrebleStave = new Stave(90, 40, 500);
+        freshTrebleStave.setContext(context);
+        const freshBassStave = new Stave(90, 180, 500);
+        freshBassStave.setContext(context);
 
         // Draw target note
+        const targetClef = getNoteClef(note.octave);
+        const targetStaveRef = targetClef === 'treble' ? freshTrebleStave : freshBassStave;
+
         const targetStaveNote = new StaveNote({
             keys: note.keys,
             duration: 'w',
@@ -90,46 +127,82 @@ function renderNotation(note, detectedNote = null) {
             strokeStyle: '#667eea'
         });
 
-        const targetVoice = new Voice({ num_beats: 4, beat_value: 4 });
-        targetVoice.addTickables([targetStaveNote]);
-        new Formatter().joinVoices([targetVoice]).format([targetVoice], 250);
-        targetVoice.draw(context, targetStaveRef);
+        // Format and draw using Voice
+        const voice = new Voice({ num_beats: 4, beat_value: 4 });
+        voice.addTickables([targetStaveNote]);
+        new Formatter().joinVoices([voice]).format([voice], 450);
+        voice.draw(context, targetStaveRef);
 
-        // If we have a detected note, render it on the right side
-        if (detectedNote) {
-            const detectedClef = getNoteClef(detectedNote.octave);
-            const detectedStaveRef = detectedClef === 'treble' ? trebleStave2 : bassStave2;
-            const isCorrect = detectedNote.name === note.name && detectedNote.octave === note.octave;
-
-            const detectedStaveNote = new StaveNote({
-                keys: detectedNote.keys,
-                duration: 'w',
-            });
-            detectedStaveNote.setStyle({
-                fillStyle: isCorrect ? '#28a745' : '#dc3545',
-                strokeStyle: isCorrect ? '#28a745' : '#dc3545'
-            });
-
-            const detectedVoice = new Voice({ num_beats: 4, beat_value: 4 });
-            detectedVoice.addTickables([detectedStaveNote]);
-            new Formatter().joinVoices([detectedVoice]).format([detectedVoice], 250);
-            detectedVoice.draw(context, detectedStaveRef);
+        // Store child count after target note
+        if (svg) {
+            targetNoteChildCount = svg.children.length;
         }
 
-        // Add labels
+        // Add target label
         context.fillStyle = '#667eea';
         context.font = 'bold 14px Arial';
-        context.fillText(`Target: ${note.name}${note.octave}`, 20, 30);
-
-        if (detectedNote) {
-            const isCorrect = detectedNote.name === note.name && detectedNote.octave === note.octave;
-            context.fillStyle = isCorrect ? '#28a745' : '#dc3545';
-            context.fillText(`You: ${detectedNote.name}${detectedNote.octave}`, 360, 30);
-        }
+        context.fillText(`Target: ${note.name}${note.octave}`, 20, 335);
     } catch (error) {
-        console.error('Rendering error:', error);
-        // If rendering fails, show error message
-        notationDiv.innerHTML = '<p style="color: red; padding: 20px;">Rendering error. Please refresh.</p>';
+        console.error('Error rendering target note:', error);
+    }
+}
+
+// Render detected note (called when user plays a note)
+function renderDetectedNote(targetNote, detectedNote) {
+    try {
+        const notationDiv = document.getElementById('notation');
+        const svg = notationDiv.querySelector('svg');
+
+        // Clear only detected notes (everything after target note)
+        if (svg && targetNoteChildCount > 0) {
+            while (svg.children.length > targetNoteChildCount) {
+                svg.removeChild(svg.lastChild);
+            }
+        }
+
+        if (!detectedNote) return;
+
+        // Create fresh Stave objects for positioning - offset x and further right for detected note
+        const freshTrebleStave = new Stave(320, 40, 270);
+        freshTrebleStave.setContext(context);
+        const freshBassStave = new Stave(320, 180, 270);
+        freshBassStave.setContext(context);
+
+        const detectedClef = getNoteClef(detectedNote.octave);
+        const isCorrect = detectedNote.name === targetNote.name && detectedNote.octave === targetNote.octave;
+
+        const detectedStaveRef = detectedClef === 'treble' ? freshTrebleStave : freshBassStave;
+
+        const detectedStaveNote = new StaveNote({
+            keys: detectedNote.keys,
+            duration: 'w',
+        });
+        detectedStaveNote.setStyle({
+            fillStyle: isCorrect ? '#28a745' : '#dc3545',
+            strokeStyle: isCorrect ? '#28a745' : '#dc3545'
+        });
+
+        // Format and draw using Voice
+        const voice = new Voice({ num_beats: 4, beat_value: 4 });
+        voice.addTickables([detectedStaveNote]);
+        new Formatter().joinVoices([voice]).format([voice], 220);
+        voice.draw(context, detectedStaveRef);
+
+        // Add detected note label
+        context.fillStyle = isCorrect ? '#28a745' : '#dc3545';
+        context.font = 'bold 14px Arial';
+        context.fillText(`You: ${detectedNote.name}${detectedNote.octave}`, 200, 335);
+    } catch (error) {
+        console.error('Error rendering detected note:', error);
+    }
+}
+
+// Main render function - calls target and detected renders separately
+function renderNotation(note, detectedNote = null) {
+    const noteToShow = detectedNote || lastDetectedNote;
+    renderTargetNote(note);
+    if (noteToShow) {
+        renderDetectedNote(note, noteToShow);
     }
 }
 
@@ -160,10 +233,8 @@ async function toggleListening() {
         stopListening();
         btn.textContent = 'Start Listening';
         btn.classList.remove('listening');
-        lastDetectedNote = null;
-        renderNotation(targetNote);
+        // Don't clear lastDetectedNote - keep it visible
         updateFeedback('idle', `Play or sing: ${targetNote.name}${targetNote.octave}`);
-        document.getElementById('detectedNote').textContent = '';
     }
 }
 
@@ -309,10 +380,10 @@ function handleDetectedNote(detectedNote, frequency) {
     document.getElementById('detectedNote').textContent =
         `Detected: ${detectedNote.name}${detectedNote.octave} (${frequency.toFixed(1)} Hz, ${centsDisplay} cents)`;
 
-    // Only re-render if the note changed
+    // Update last detected note and render if note changed
     if (noteChanged) {
         lastDetectedNote = detectedNote;
-        renderNotation(targetNote, detectedNote);
+        renderNotation(targetNote);
 
         // Update feedback
         if (isCorrect) {
@@ -325,7 +396,6 @@ function handleDetectedNote(detectedNote, frequency) {
             setTimeout(() => {
                 if (isListening) {
                     generateNewNote();
-                    lastDetectedNote = null;
                     updateFeedback('listening', 'Great! Now try this one...');
                 }
             }, 2000);
