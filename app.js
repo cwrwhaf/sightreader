@@ -147,10 +147,8 @@ function renderTargetNote(note, color = '#667eea') {
             targetNoteChildCount = svg.children.length;
         }
 
-        // Add target label
-        context.fillStyle = '#667eea';
-        context.font = 'bold 14px Arial';
-        context.fillText(`Target: ${note.name}${note.octave}`, 20, 335);
+        // Don't display target note name - let user figure it out!
+        // Will be revealed when they play it correctly
 
         // Move to next position for next note
         currentNoteX += noteWidth;
@@ -264,11 +262,11 @@ function generateNewNote() {
     lastDetectedNote = null;
     renderTargetNote(targetNote);
 
-    // Update feedback based on listening state
+    // Update feedback based on listening state (don't reveal the note!)
     if (isListening) {
-        updateFeedback('listening', `Next note: ${targetNote.name}${targetNote.octave}`);
+        updateFeedback('listening', 'New note! Can you play it?');
     } else {
-        updateFeedback('idle', `Play or sing: ${targetNote.name}${targetNote.octave}`);
+        updateFeedback('idle', 'Click "Start Listening" to begin');
     }
 
     document.getElementById('detectedNote').textContent = '';
@@ -451,7 +449,7 @@ function handleDetectedNote(detectedNote, frequency) {
             const centsMessage = Math.abs(detectedNote.cents) < 10
                 ? ' Perfect pitch!'
                 : ` (${Math.abs(detectedNote.cents).toFixed(0)} cents ${detectedNote.cents > 0 ? 'sharp' : 'flat'})`;
-            updateFeedback('correct', `Correct! You played ${detectedNote.name}${detectedNote.octave}${centsMessage}`);
+            updateFeedback('correct', `Correct! The note was ${detectedNote.name}${detectedNote.octave}${centsMessage}`);
 
             // Mark target note as correct (turn green) and generate new note
             setTimeout(() => {
@@ -459,8 +457,7 @@ function handleDetectedNote(detectedNote, frequency) {
                 generateNewNote();
             }, 500); // Small delay to show the green match
         } else {
-            updateFeedback('incorrect',
-                `Not quite. Target: ${targetNote.name}${targetNote.octave}, You: ${detectedNote.name}${detectedNote.octave}`);
+            updateFeedback('incorrect', `Not quite. Try again!`);
         }
     }
 }
