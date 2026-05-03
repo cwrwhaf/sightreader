@@ -44,6 +44,10 @@ let trebleStave = null;
 let bassStave = null;
 let stavesChildCount = 0; // Number of SVG children after drawing staves
 let targetNoteChildCount = 0; // Number of SVG children after drawing target note
+let currentNoteX = 90; // Starting x position for notes
+const noteWidth = 80; // Width allocated per note
+const staveEndX = 580; // End of the stave
+let lastTargetNoteChildCount = 0; // Track where the last target note ends
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -96,22 +100,27 @@ function initializeStaves() {
 }
 
 // Render target note only (called once per new target note)
-function renderTargetNote(note) {
+function renderTargetNote(note, color = '#667eea') {
     try {
         const notationDiv = document.getElementById('notation');
         const svg = notationDiv.querySelector('svg');
 
-        // Clear only notes (everything after staves), keep staves
-        if (svg) {
+        // Check if we need to clear and reset (stave is full)
+        if (currentNoteX + noteWidth > staveEndX) {
+            currentNoteX = 90; // Reset to start
+            // Clear all notes
             while (svg.children.length > stavesChildCount) {
                 svg.removeChild(svg.lastChild);
             }
         }
 
-        // Create fresh Stave objects for positioning - offset x to start after clef
-        const freshTrebleStave = new Stave(90, 40, 500);
+        // Store where this target note starts
+        lastTargetNoteChildCount = svg ? svg.children.length : stavesChildCount;
+
+        // Create fresh Stave objects for positioning at current x position
+        const freshTrebleStave = new Stave(currentNoteX, 40, noteWidth);
         freshTrebleStave.setContext(context);
-        const freshBassStave = new Stave(90, 180, 500);
+        const freshBassStave = new Stave(currentNoteX, 180, noteWidth);
         freshBassStave.setContext(context);
 
         // Draw target note
@@ -120,17 +129,17 @@ function renderTargetNote(note) {
 
         const targetStaveNote = new StaveNote({
             keys: note.keys,
-            duration: 'w',
+            duration: 'q', // Quarter note for tighter spacing
         });
         targetStaveNote.setStyle({
-            fillStyle: '#667eea',
-            strokeStyle: '#667eea'
+            fillStyle: color,
+            strokeStyle: color
         });
 
         // Format and draw using Voice
-        const voice = new Voice({ num_beats: 4, beat_value: 4 });
+        const voice = new Voice({ num_beats: 1, beat_value: 4 });
         voice.addTickables([targetStaveNote]);
-        new Formatter().joinVoices([voice]).format([voice], 450);
+        new Formatter().joinVoices([voice]).format([voice], noteWidth - 10);
         voice.draw(context, targetStaveRef);
 
         // Store child count after target note
@@ -142,12 +151,15 @@ function renderTargetNote(note) {
         context.fillStyle = '#667eea';
         context.font = 'bold 14px Arial';
         context.fillText(`Target: ${note.name}${note.octave}`, 20, 335);
+
+        // Move to next position for next note
+        currentNoteX += noteWidth;
     } catch (error) {
         console.error('Error rendering target note:', error);
     }
 }
 
-// Render detected note (called when user plays a note)
+// Render detected note overlay (shows what user played)
 function renderDetectedNote(targetNote, detectedNote) {
     try {
         const notationDiv = document.getElementById('notation');
@@ -162,10 +174,13 @@ function renderDetectedNote(targetNote, detectedNote) {
 
         if (!detectedNote) return;
 
+        // Use the position of the current target note
+        const targetNoteX = currentNoteX - noteWidth;
+
         // Create fresh Stave objects for positioning - same position as target note
-        const freshTrebleStave = new Stave(90, 40, 500);
+        const freshTrebleStave = new Stave(targetNoteX, 40, noteWidth);
         freshTrebleStave.setContext(context);
-        const freshBassStave = new Stave(90, 180, 500);
+        const freshBassStave = new Stave(targetNoteX, 180, noteWidth);
         freshBassStave.setContext(context);
 
         const detectedClef = getNoteClef(detectedNote.octave);
@@ -175,7 +190,7 @@ function renderDetectedNote(targetNote, detectedNote) {
 
         const detectedStaveNote = new StaveNote({
             keys: detectedNote.keys,
-            duration: 'w',
+            duration: 'q',
         });
         detectedStaveNote.setStyle({
             fillStyle: isCorrect ? '#28a745' : '#dc3545',
@@ -183,35 +198,79 @@ function renderDetectedNote(targetNote, detectedNote) {
         });
 
         // Format and draw using Voice
-        const voice = new Voice({ num_beats: 4, beat_value: 4 });
+        const voice = new Voice({ num_beats: 1, beat_value: 4 });
         voice.addTickables([detectedStaveNote]);
-        new Formatter().joinVoices([voice]).format([voice], 450);
+        new Formatter().joinVoices([voice]).format([voice], noteWidth - 10);
         voice.draw(context, detectedStaveRef);
-
-        // Add detected note label
-        context.fillStyle = isCorrect ? '#28a745' : '#dc3545';
-        context.font = 'bold 14px Arial';
-        context.fillText(`You: ${detectedNote.name}${detectedNote.octave}`, 200, 335);
     } catch (error) {
         console.error('Error rendering detected note:', error);
     }
 }
 
-// Main render function - calls target and detected renders separately
-function renderNotation(note, detectedNote = null) {
-    const noteToShow = detectedNote || lastDetectedNote;
-    renderTargetNote(note);
-    if (noteToShow) {
-        renderDetectedNote(note, noteToShow);
+// Change the last target note to green (when user plays correctly)
+function markTargetNoteCorrect(note) {
+    try {
+        const notationDiv = document.getElementById('notation');
+        const svg = notationDiv.querySelector('svg');
+
+        // Remove the last target note and any detected notes
+        if (svg) {
+            while (svg.children.length > lastTargetNoteChildCount) {
+                svg.removeChild(svg.lastChild);
+            }
+        }
+
+        // Move back to the last position
+        const lastNoteX = currentNoteX - noteWidth;
+
+        // Create fresh Stave objects for positioning
+        const freshTrebleStave = new Stave(lastNoteX, 40, noteWidth);
+        freshTrebleStave.setContext(context);
+        const freshBassStave = new Stave(lastNoteX, 180, noteWidth);
+        freshBassStave.setContext(context);
+
+        // Draw target note in green
+        const targetClef = getNoteClef(note.octave);
+        const targetStaveRef = targetClef === 'treble' ? freshTrebleStave : freshBassStave;
+
+        const targetStaveNote = new StaveNote({
+            keys: note.keys,
+            duration: 'q',
+        });
+        targetStaveNote.setStyle({
+            fillStyle: '#28a745',
+            strokeStyle: '#28a745'
+        });
+
+        // Format and draw using Voice
+        const voice = new Voice({ num_beats: 1, beat_value: 4 });
+        voice.addTickables([targetStaveNote]);
+        new Formatter().joinVoices([voice]).format([voice], noteWidth - 10);
+        voice.draw(context, targetStaveRef);
+
+        // Restore child count
+        if (svg) {
+            targetNoteChildCount = svg.children.length;
+        }
+    } catch (error) {
+        console.error('Error marking target note correct:', error);
     }
 }
+
 
 // Generate a new random note
 function generateNewNote() {
     targetNote = NOTES[Math.floor(Math.random() * NOTES.length)];
     lastDetectedNote = null;
-    renderNotation(targetNote);
-    updateFeedback('idle', `Play or sing: ${targetNote.name}${targetNote.octave}`);
+    renderTargetNote(targetNote);
+
+    // Update feedback based on listening state
+    if (isListening) {
+        updateFeedback('listening', `Next note: ${targetNote.name}${targetNote.octave}`);
+    } else {
+        updateFeedback('idle', `Play or sing: ${targetNote.name}${targetNote.octave}`);
+    }
+
     document.getElementById('detectedNote').textContent = '';
 }
 
@@ -380,10 +439,12 @@ function handleDetectedNote(detectedNote, frequency) {
     document.getElementById('detectedNote').textContent =
         `Detected: ${detectedNote.name}${detectedNote.octave} (${frequency.toFixed(1)} Hz, ${centsDisplay} cents)`;
 
-    // Update last detected note and render if note changed
+    // Only process when note changes
     if (noteChanged) {
         lastDetectedNote = detectedNote;
-        renderNotation(targetNote);
+
+        // Show the detected note on the staff
+        renderDetectedNote(targetNote, detectedNote);
 
         // Update feedback
         if (isCorrect) {
@@ -392,13 +453,11 @@ function handleDetectedNote(detectedNote, frequency) {
                 : ` (${Math.abs(detectedNote.cents).toFixed(0)} cents ${detectedNote.cents > 0 ? 'sharp' : 'flat'})`;
             updateFeedback('correct', `Correct! You played ${detectedNote.name}${detectedNote.octave}${centsMessage}`);
 
-            // Auto-generate new note after success
+            // Mark target note as correct (turn green) and generate new note
             setTimeout(() => {
-                if (isListening) {
-                    generateNewNote();
-                    updateFeedback('listening', 'Great! Now try this one...');
-                }
-            }, 2000);
+                markTargetNoteCorrect(targetNote);
+                generateNewNote();
+            }, 500); // Small delay to show the green match
         } else {
             updateFeedback('incorrect',
                 `Not quite. Target: ${targetNote.name}${targetNote.octave}, You: ${detectedNote.name}${detectedNote.octave}`);
