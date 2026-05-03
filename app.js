@@ -91,6 +91,7 @@ let analyser = null;
 let microphone = null;
 let isListening = false;
 let detectionInterval = null;
+let keyDetectionMode = true; // Start in key detection mode
 
 // Rendering state (persistent)
 let renderer = null;
@@ -106,15 +107,16 @@ let lastTargetNoteChildCount = 0; // Track where the last target note ends
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    // Select key first, before drawing staves
+    // Randomly select initial key
     selectNewKey();
 
-    // Now initialize staves with the selected key
+    // Initialize staves WITH key signature showing
     initializeStaves();
 
-    // Generate first note and update score
-    generateNewNote();
+    // Don't generate a note yet - wait for user to identify the key
     updateScoreDisplay();
+    updateKeyDisplay();
+    updateFeedback('idle', 'What key is this? Click "Start Listening" and play any note from this key');
 
     document.getElementById('startBtn').addEventListener('click', toggleListening);
     document.getElementById('newNoteBtn').addEventListener('click', generateNewNote);
@@ -129,6 +131,16 @@ function getNoteClef(octave) {
 function updateScoreDisplay() {
     document.getElementById('currentScore').textContent = wrongNoteCount;
     document.getElementById('bestScore').textContent = bestScore === null ? '-' : bestScore;
+}
+
+// Update key display
+function updateKeyDisplay() {
+    const keyDisplayEl = document.getElementById('currentKeyDisplay');
+    if (keyDetectionMode) {
+        keyDisplayEl.textContent = '?';
+    } else {
+        keyDisplayEl.textContent = currentKey;
+    }
 }
 
 // Reset score for new page
@@ -148,6 +160,39 @@ function incrementWrongCount() {
 }
 
 // Select a new random key
+// Find all keys that contain a given note
+function findKeysContainingNote(noteName) {
+    const keys = [];
+    for (const [key, notes] of Object.entries(KEY_SIGNATURES)) {
+        if (notes.includes(noteName)) {
+            keys.push(key);
+        }
+    }
+    return keys;
+}
+
+// Set key based on a note played by the user
+function setKeyFromNote(note) {
+    const possibleKeys = findKeysContainingNote(note.name);
+    if (possibleKeys.length === 0) {
+        console.error('No keys found for note:', note.name);
+        return;
+    }
+
+    // Pick a random key from the possible keys
+    const newKey = possibleKeys[Math.floor(Math.random() * possibleKeys.length)];
+    currentKey = newKey;
+
+    // Filter notes from ALL_NOTES that belong to this key
+    const keyNotes = KEY_SIGNATURES[currentKey];
+    currentKeyNotes = ALL_NOTES.filter(n =>
+        keyNotes.includes(n.name)
+    );
+
+    console.log(`Key set to: ${currentKey} major (from note ${note.name}${note.octave})`);
+    console.log(`Available notes: ${currentKeyNotes.length}`);
+}
+
 function selectNewKey() {
     const newKey = KEY_NAMES[Math.floor(Math.random() * KEY_NAMES.length)];
     currentKey = newKey;
@@ -173,18 +218,22 @@ function redrawStaves() {
     }
 
     try {
-        // Draw treble clef stave with key signature
+        // Draw treble clef stave with key signature (always show it)
         trebleStave = new Stave(10, 40, 580);
         trebleStave.addClef('treble').addKeySignature(currentKey).setContext(context).draw();
 
-        // Draw bass clef stave with key signature
+        // Draw bass clef stave with key signature (always show it)
         bassStave = new Stave(10, 180, 580);
         bassStave.addClef('bass').addKeySignature(currentKey).setContext(context).draw();
 
         // Add labels
         context.fillStyle = '#667eea';
         context.font = 'bold 14px Arial';
-        context.fillText('Target', 20, 25);
+        if (!keyDetectionMode) {
+            context.fillText('Target', 20, 25);
+        } else {
+            context.fillText('Identify Key', 20, 25);
+        }
 
         context.fillStyle = '#333';
         context.fillText('You Played', 200, 25);
@@ -233,12 +282,29 @@ function renderTargetNote(note, color = '#667eea') {
         // Check if we need to clear and reset (stave is full)
         if (currentNoteX + noteWidth > staveEndX) {
             currentNoteX = 90; // Reset to start
-            // Reset score and select new key
+            // Reset score and go back to key detection mode
             resetScore();
+            keyDetectionMode = true;
+            targetNote = null;
+
+            // Select a new random key
             selectNewKey();
-            console.log(`Starting new page in ${currentKey} major`);
+            console.log('Page full - new key selected:', currentKey);
+
+            // Update key display to show "?"
+            updateKeyDisplay();
+
             // Redraw staves with new key signature
             redrawStaves();
+
+            // Update feedback
+            if (isListening) {
+                updateFeedback('listening', 'Page complete! New key - play any note from this key');
+            } else {
+                updateFeedback('idle', 'Page complete! What is this new key? Click "Start Listening"');
+            }
+
+            return; // Don't render a note yet
         }
 
         // Store where this target note starts
@@ -298,17 +364,18 @@ function renderDetectedNote(targetNote, detectedNote) {
         const notationDiv = document.getElementById('notation');
         const svg = notationDiv.querySelector('svg');
 
-        // Clear only detected notes (everything after target note)
-        if (svg && targetNoteChildCount > 0) {
-            while (svg.children.length > targetNoteChildCount) {
+        // Clear only detected notes (everything after staves or target note)
+        const clearFromCount = keyDetectionMode ? stavesChildCount : targetNoteChildCount;
+        if (svg && clearFromCount > 0) {
+            while (svg.children.length > clearFromCount) {
                 svg.removeChild(svg.lastChild);
             }
         }
 
         if (!detectedNote) return;
 
-        // Use the position of the current target note
-        const targetNoteX = currentNoteX - noteWidth;
+        // In key detection mode, show at a fixed position; otherwise use target note position
+        const targetNoteX = keyDetectionMode ? 200 : (currentNoteX - noteWidth);
 
         // Create fresh Stave objects for positioning - same position as target note
         const freshTrebleStave = new Stave(targetNoteX, 40, noteWidth);
@@ -317,7 +384,8 @@ function renderDetectedNote(targetNote, detectedNote) {
         freshBassStave.setContext(context);
 
         const detectedClef = getNoteClef(detectedNote.octave);
-        const isCorrect = areNotesEquivalent(detectedNote, targetNote);
+        const isCorrect = targetNote ? areNotesEquivalent(detectedNote, targetNote) : false;
+        const isKeyDetection = keyDetectionMode;
 
         const detectedStaveRef = detectedClef === 'treble' ? freshTrebleStave : freshBassStave;
 
@@ -333,9 +401,19 @@ function renderDetectedNote(targetNote, detectedNote) {
             detectedStaveNote.addModifier(new Accidental('b'), 0);
         }
 
+        // Color: blue for key detection, green for correct, red for incorrect
+        let noteColor;
+        if (isKeyDetection) {
+            noteColor = '#667eea'; // Blue for key detection
+        } else if (isCorrect) {
+            noteColor = '#28a745'; // Green for correct
+        } else {
+            noteColor = '#dc3545'; // Red for incorrect
+        }
+
         detectedStaveNote.setStyle({
-            fillStyle: isCorrect ? '#28a745' : '#dc3545',
-            strokeStyle: isCorrect ? '#28a745' : '#dc3545'
+            fillStyle: noteColor,
+            strokeStyle: noteColor
         });
 
         // Format and draw using Voice
@@ -409,13 +487,18 @@ function markTargetNoteCorrect(note) {
 
 // Generate a new random note
 function generateNewNote() {
+    // Don't generate notes in key detection mode
+    if (keyDetectionMode) {
+        updateFeedback('idle', 'Please identify the key first by playing a note from this key');
+        return;
+    }
+
     if (!currentKeyNotes || currentKeyNotes.length === 0) {
         console.error('No notes available in current key!');
         return;
     }
 
     targetNote = currentKeyNotes[Math.floor(Math.random() * currentKeyNotes.length)];
-    console.log('Generated target note:', targetNote.name + targetNote.octave, 'Freq:', targetNote.frequency);
     lastDetectedNote = null;
     renderTargetNote(targetNote);
 
@@ -438,7 +521,12 @@ async function toggleListening() {
             await startListening();
             btn.textContent = 'Stop Listening';
             btn.classList.add('listening');
-            updateFeedback('listening', 'Listening... play the note!');
+
+            if (keyDetectionMode) {
+                updateFeedback('listening', 'Listening... play any note from the key!');
+            } else {
+                updateFeedback('listening', 'Listening... play the note!');
+            }
         } catch (error) {
             console.error('Error starting microphone:', error);
             updateFeedback('incorrect', 'Could not access microphone. Please grant permission.');
@@ -447,8 +535,14 @@ async function toggleListening() {
         stopListening();
         btn.textContent = 'Start Listening';
         btn.classList.remove('listening');
-        // Don't clear lastDetectedNote - keep it visible
-        updateFeedback('idle', `Play or sing: ${targetNote.name}${targetNote.octave}`);
+
+        if (keyDetectionMode) {
+            updateFeedback('idle', 'What key is this? Click "Start Listening" and play a note from this key');
+        } else if (targetNote) {
+            updateFeedback('idle', `Play or sing: ${targetNote.name}${targetNote.octave}`);
+        } else {
+            updateFeedback('idle', 'Click "Start Listening" to begin');
+        }
     }
 }
 
@@ -592,46 +686,35 @@ function frequencyToNote(frequency) {
     // Convert to VexFlow format
     let keys = [`${noteName}/${octave}`];
 
-    const result = {
+    return {
         name: noteName,
         octave: octave,
         keys: keys,
         frequency: frequency,
         cents: cents
     };
-
-    console.log('frequencyToNote:', frequency.toFixed(1), 'Hz ->', result.name + result.octave);
-    return result;
 }
 
 // Check if two notes are enharmonically equivalent (e.g., C# and Db)
 function areNotesEquivalent(note1, note2) {
-    console.log('Comparing:', note1.name + note1.octave, 'vs', note2.name + note2.octave);
-
     if (note1.octave !== note2.octave) {
-        console.log('Different octaves');
         return false;
     }
 
     // Since frequencyToNote() now returns the correct enharmonic spelling
     // for the current key, we can compare by name directly
     if (note1.name === note2.name) {
-        console.log('Names match!');
         return true;
     }
 
     // Also check if they're enharmonic equivalents by frequency
     // Use larger tolerance since detected frequency varies
     const freqDiff = Math.abs(note1.frequency - note2.frequency);
-    console.log('Frequency difference:', freqDiff.toFixed(2), 'Hz');
     return freqDiff < 5;
 }
 
 // Handle detected note
 function handleDetectedNote(detectedNote, frequency) {
-    console.log('Target:', targetNote.name + targetNote.octave, 'Detected:', detectedNote.name + detectedNote.octave);
-    const isCorrect = areNotesEquivalent(detectedNote, targetNote);
-
     // Check if this is a different note than the last one detected
     const noteChanged = !lastDetectedNote ||
                        lastDetectedNote.name !== detectedNote.name ||
@@ -643,28 +726,72 @@ function handleDetectedNote(detectedNote, frequency) {
         `Detected: ${detectedNote.name}${detectedNote.octave} (${frequency.toFixed(1)} Hz, ${centsDisplay} cents)`;
 
     // Only process when note changes
-    if (noteChanged) {
-        lastDetectedNote = detectedNote;
+    if (!noteChanged) return;
 
+    lastDetectedNote = detectedNote;
+
+    // KEY DETECTION MODE: Check if played note is in the selected key
+    if (keyDetectionMode) {
         // Show the detected note on the staff
-        renderDetectedNote(targetNote, detectedNote);
+        renderDetectedNote(null, detectedNote);
 
-        // Update feedback
-        if (isCorrect) {
-            const centsMessage = Math.abs(detectedNote.cents) < 10
-                ? ' Perfect pitch!'
-                : ` (${Math.abs(detectedNote.cents).toFixed(0)} cents ${detectedNote.cents > 0 ? 'sharp' : 'flat'})`;
-            updateFeedback('correct', `Correct! The note was ${detectedNote.name}${detectedNote.octave}${centsMessage}`);
+        // Check if the detected note belongs to the current key
+        const keyNotes = KEY_SIGNATURES[currentKey];
+        const isCorrectKey = keyNotes.includes(detectedNote.name);
 
-            // Mark target note as correct (turn green) and generate new note
+        if (isCorrectKey) {
+            // Correct! User identified the key
+            updateFeedback('correct', `Correct! This is ${currentKey} major! Get ready for the first note...`);
+
+            // Exit key detection mode
+            keyDetectionMode = false;
+
+            // Update key display to show the key name
+            updateKeyDisplay();
+
+            // Redraw staves to update label
+            redrawStaves();
+
+            // Generate the first target note after a delay
             setTimeout(() => {
-                markTargetNoteCorrect(targetNote);
                 generateNewNote();
-            }, 500); // Small delay to show the green match
+                updateFeedback('listening', 'New note! Can you play it?');
+            }, 2000);
         } else {
+            // Wrong note - not in this key
             incrementWrongCount();
-            updateFeedback('incorrect', `Not quite. Try again!`);
+            updateFeedback('incorrect', `${detectedNote.name} is not in this key. Try again!`);
         }
+
+        return;
+    }
+
+    // NORMAL MODE: Check if note matches target
+    if (!targetNote) {
+        console.log('No target note yet - waiting for note generation');
+        return;
+    }
+
+    const isCorrect = areNotesEquivalent(detectedNote, targetNote);
+
+    // Show the detected note on the staff
+    renderDetectedNote(targetNote, detectedNote);
+
+    // Update feedback
+    if (isCorrect) {
+        const centsMessage = Math.abs(detectedNote.cents) < 10
+            ? ' Perfect pitch!'
+            : ` (${Math.abs(detectedNote.cents).toFixed(0)} cents ${detectedNote.cents > 0 ? 'sharp' : 'flat'})`;
+        updateFeedback('correct', `Correct! The note was ${detectedNote.name}${detectedNote.octave}${centsMessage}`);
+
+        // Mark target note as correct (turn green) and generate new note
+        setTimeout(() => {
+            markTargetNoteCorrect(targetNote);
+            generateNewNote();
+        }, 500); // Small delay to show the green match
+    } else {
+        incrementWrongCount();
+        updateFeedback('incorrect', `Not quite. Try again!`);
     }
 }
 
