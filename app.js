@@ -1,32 +1,87 @@
 const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental } = Vex.Flow;
 
-// Musical notes configuration - Bass and Treble clef range
-const NOTES = [
+// All chromatic notes with sharps and flats (bass and treble range)
+const ALL_NOTES = [
     // Bass clef notes (C2-B3)
     { name: 'C', octave: 2, keys: ['C/2'], frequency: 65.41 },
+    { name: 'C#', octave: 2, keys: ['C#/2'], frequency: 69.30 },
+    { name: 'Db', octave: 2, keys: ['Db/2'], frequency: 69.30 },
     { name: 'D', octave: 2, keys: ['D/2'], frequency: 73.42 },
+    { name: 'D#', octave: 2, keys: ['D#/2'], frequency: 77.78 },
+    { name: 'Eb', octave: 2, keys: ['Eb/2'], frequency: 77.78 },
     { name: 'E', octave: 2, keys: ['E/2'], frequency: 82.41 },
     { name: 'F', octave: 2, keys: ['F/2'], frequency: 87.31 },
+    { name: 'F#', octave: 2, keys: ['F#/2'], frequency: 92.50 },
+    { name: 'Gb', octave: 2, keys: ['Gb/2'], frequency: 92.50 },
     { name: 'G', octave: 2, keys: ['G/2'], frequency: 98.00 },
+    { name: 'G#', octave: 2, keys: ['G#/2'], frequency: 103.83 },
+    { name: 'Ab', octave: 2, keys: ['Ab/2'], frequency: 103.83 },
     { name: 'A', octave: 2, keys: ['A/2'], frequency: 110.00 },
+    { name: 'A#', octave: 2, keys: ['A#/2'], frequency: 116.54 },
+    { name: 'Bb', octave: 2, keys: ['Bb/2'], frequency: 116.54 },
     { name: 'B', octave: 2, keys: ['B/2'], frequency: 123.47 },
+
     { name: 'C', octave: 3, keys: ['C/3'], frequency: 130.81 },
+    { name: 'C#', octave: 3, keys: ['C#/3'], frequency: 138.59 },
+    { name: 'Db', octave: 3, keys: ['Db/3'], frequency: 138.59 },
     { name: 'D', octave: 3, keys: ['D/3'], frequency: 146.83 },
+    { name: 'D#', octave: 3, keys: ['D#/3'], frequency: 155.56 },
+    { name: 'Eb', octave: 3, keys: ['Eb/3'], frequency: 155.56 },
     { name: 'E', octave: 3, keys: ['E/3'], frequency: 164.81 },
     { name: 'F', octave: 3, keys: ['F/3'], frequency: 174.61 },
+    { name: 'F#', octave: 3, keys: ['F#/3'], frequency: 185.00 },
+    { name: 'Gb', octave: 3, keys: ['Gb/3'], frequency: 185.00 },
     { name: 'G', octave: 3, keys: ['G/3'], frequency: 196.00 },
+    { name: 'G#', octave: 3, keys: ['G#/3'], frequency: 207.65 },
+    { name: 'Ab', octave: 3, keys: ['Ab/3'], frequency: 207.65 },
     { name: 'A', octave: 3, keys: ['A/3'], frequency: 220.00 },
+    { name: 'A#', octave: 3, keys: ['A#/3'], frequency: 233.08 },
+    { name: 'Bb', octave: 3, keys: ['Bb/3'], frequency: 233.08 },
     { name: 'B', octave: 3, keys: ['B/3'], frequency: 246.94 },
+
     // Treble clef notes (C4-C5)
     { name: 'C', octave: 4, keys: ['C/4'], frequency: 261.63 },
+    { name: 'C#', octave: 4, keys: ['C#/4'], frequency: 277.18 },
+    { name: 'Db', octave: 4, keys: ['Db/4'], frequency: 277.18 },
     { name: 'D', octave: 4, keys: ['D/4'], frequency: 293.66 },
+    { name: 'D#', octave: 4, keys: ['D#/4'], frequency: 311.13 },
+    { name: 'Eb', octave: 4, keys: ['Eb/4'], frequency: 311.13 },
     { name: 'E', octave: 4, keys: ['E/4'], frequency: 329.63 },
     { name: 'F', octave: 4, keys: ['F/4'], frequency: 349.23 },
+    { name: 'F#', octave: 4, keys: ['F#/4'], frequency: 369.99 },
+    { name: 'Gb', octave: 4, keys: ['Gb/4'], frequency: 369.99 },
     { name: 'G', octave: 4, keys: ['G/4'], frequency: 392.00 },
+    { name: 'G#', octave: 4, keys: ['G#/4'], frequency: 415.30 },
+    { name: 'Ab', octave: 4, keys: ['Ab/4'], frequency: 415.30 },
     { name: 'A', octave: 4, keys: ['A/4'], frequency: 440.00 },
+    { name: 'A#', octave: 4, keys: ['A#/4'], frequency: 466.16 },
+    { name: 'Bb', octave: 4, keys: ['Bb/4'], frequency: 466.16 },
     { name: 'B', octave: 4, keys: ['B/4'], frequency: 493.88 },
     { name: 'C', octave: 5, keys: ['C/5'], frequency: 523.25 },
 ];
+
+// Major key signatures (which notes belong to each key)
+// Using only keys that VexFlow reliably supports
+const KEY_SIGNATURES = {
+    'C': ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
+    'G': ['G', 'A', 'B', 'C', 'D', 'E', 'F#'],
+    'D': ['D', 'E', 'F#', 'G', 'A', 'B', 'C#'],
+    'A': ['A', 'B', 'C#', 'D', 'E', 'F#', 'G#'],
+    'E': ['E', 'F#', 'G#', 'A', 'B', 'C#', 'D#'],
+    'B': ['B', 'C#', 'D#', 'E', 'F#', 'G#', 'A#'],
+    'F': ['F', 'G', 'A', 'Bb', 'C', 'D', 'E'],
+    'Bb': ['Bb', 'C', 'D', 'Eb', 'F', 'G', 'A'],
+    'Eb': ['Eb', 'F', 'G', 'Ab', 'Bb', 'C', 'D'],
+    'Ab': ['Ab', 'Bb', 'C', 'Db', 'Eb', 'F', 'G'],
+};
+
+const KEY_NAMES = Object.keys(KEY_SIGNATURES);
+let currentKey = 'C';
+let currentKeyNotes = [];
+
+// Score tracking
+let wrongNoteCount = 0;
+let bestScore = null;
 
 // App state
 let targetNote = null;
@@ -51,8 +106,15 @@ let lastTargetNoteChildCount = 0; // Track where the last target note ends
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    // Select key first, before drawing staves
+    selectNewKey();
+
+    // Now initialize staves with the selected key
     initializeStaves();
+
+    // Generate first note and update score
     generateNewNote();
+    updateScoreDisplay();
 
     document.getElementById('startBtn').addEventListener('click', toggleListening);
     document.getElementById('newNoteBtn').addEventListener('click', generateNewNote);
@@ -61,6 +123,89 @@ document.addEventListener('DOMContentLoaded', () => {
 // Helper to determine which clef a note belongs to
 function getNoteClef(octave) {
     return octave <= 3 ? 'bass' : 'treble';
+}
+
+// Update score display
+function updateScoreDisplay() {
+    document.getElementById('currentScore').textContent = wrongNoteCount;
+    document.getElementById('bestScore').textContent = bestScore === null ? '-' : bestScore;
+}
+
+// Reset score for new page
+function resetScore() {
+    // Update best score if current is better (lower)
+    if (bestScore === null || wrongNoteCount < bestScore) {
+        bestScore = wrongNoteCount;
+    }
+    wrongNoteCount = 0;
+    updateScoreDisplay();
+}
+
+// Increment wrong note count
+function incrementWrongCount() {
+    wrongNoteCount++;
+    updateScoreDisplay();
+}
+
+// Select a new random key
+function selectNewKey() {
+    const newKey = KEY_NAMES[Math.floor(Math.random() * KEY_NAMES.length)];
+    currentKey = newKey;
+
+    // Filter notes from ALL_NOTES that belong to this key
+    const keyNotes = KEY_SIGNATURES[currentKey];
+    currentKeyNotes = ALL_NOTES.filter(note =>
+        keyNotes.includes(note.name)
+    );
+
+    console.log(`New key: ${currentKey} major`);
+    console.log(`Available notes: ${currentKeyNotes.length}`);
+}
+
+// Redraw staves with current key signature
+function redrawStaves() {
+    const notationDiv = document.getElementById('notation');
+    const svg = notationDiv.querySelector('svg');
+
+    // Clear all SVG content
+    if (svg) {
+        svg.innerHTML = '';
+    }
+
+    try {
+        // Draw treble clef stave with key signature
+        trebleStave = new Stave(10, 40, 580);
+        trebleStave.addClef('treble').addKeySignature(currentKey).setContext(context).draw();
+
+        // Draw bass clef stave with key signature
+        bassStave = new Stave(10, 180, 580);
+        bassStave.addClef('bass').addKeySignature(currentKey).setContext(context).draw();
+
+        // Add labels
+        context.fillStyle = '#667eea';
+        context.font = 'bold 14px Arial';
+        context.fillText('Target', 20, 25);
+
+        context.fillStyle = '#333';
+        context.fillText('You Played', 200, 25);
+
+        // Update child count
+        if (svg) {
+            stavesChildCount = svg.children.length;
+        }
+    } catch (error) {
+        console.error('Error drawing staves with key signature:', currentKey, error);
+        // Fallback: draw without key signature
+        trebleStave = new Stave(10, 40, 580);
+        trebleStave.addClef('treble').setContext(context).draw();
+
+        bassStave = new Stave(10, 180, 580);
+        bassStave.addClef('bass').setContext(context).draw();
+
+        if (svg) {
+            stavesChildCount = svg.children.length;
+        }
+    }
 }
 
 // Initialize staves once - only called on page load
@@ -73,27 +218,7 @@ function initializeStaves() {
     context = renderer.getContext();
 
     try {
-        // Draw treble clef stave
-        trebleStave = new Stave(10, 40, 580);
-        trebleStave.addClef('treble').setContext(context).draw();
-
-        // Draw bass clef stave
-        bassStave = new Stave(10, 180, 580);
-        bassStave.addClef('bass').setContext(context).draw();
-
-        // Add labels
-        context.fillStyle = '#667eea';
-        context.font = 'bold 14px Arial';
-        context.fillText('Target', 20, 25);
-
-        context.fillStyle = '#333';
-        context.fillText('You Played', 200, 25);
-
-        // Count SVG children - everything after this is notes that can be cleared
-        const svg = notationDiv.querySelector('svg');
-        if (svg) {
-            stavesChildCount = svg.children.length;
-        }
+        redrawStaves();
     } catch (error) {
         console.error('Stave initialization error:', error);
     }
@@ -108,10 +233,12 @@ function renderTargetNote(note, color = '#667eea') {
         // Check if we need to clear and reset (stave is full)
         if (currentNoteX + noteWidth > staveEndX) {
             currentNoteX = 90; // Reset to start
-            // Clear all notes
-            while (svg.children.length > stavesChildCount) {
-                svg.removeChild(svg.lastChild);
-            }
+            // Reset score and select new key
+            resetScore();
+            selectNewKey();
+            console.log(`Starting new page in ${currentKey} major`);
+            // Redraw staves with new key signature
+            redrawStaves();
         }
 
         // Store where this target note starts
@@ -131,6 +258,14 @@ function renderTargetNote(note, color = '#667eea') {
             keys: note.keys,
             duration: 'q', // Quarter note for tighter spacing
         });
+
+        // Add accidental if note has sharp or flat
+        if (note.name.includes('#')) {
+            targetStaveNote.addModifier(new Accidental('#'), 0);
+        } else if (note.name.includes('b')) {
+            targetStaveNote.addModifier(new Accidental('b'), 0);
+        }
+
         targetStaveNote.setStyle({
             fillStyle: color,
             strokeStyle: color
@@ -182,7 +317,7 @@ function renderDetectedNote(targetNote, detectedNote) {
         freshBassStave.setContext(context);
 
         const detectedClef = getNoteClef(detectedNote.octave);
-        const isCorrect = detectedNote.name === targetNote.name && detectedNote.octave === targetNote.octave;
+        const isCorrect = areNotesEquivalent(detectedNote, targetNote);
 
         const detectedStaveRef = detectedClef === 'treble' ? freshTrebleStave : freshBassStave;
 
@@ -190,6 +325,14 @@ function renderDetectedNote(targetNote, detectedNote) {
             keys: detectedNote.keys,
             duration: 'q',
         });
+
+        // Add accidental if note has sharp or flat
+        if (detectedNote.name.includes('#')) {
+            detectedStaveNote.addModifier(new Accidental('#'), 0);
+        } else if (detectedNote.name.includes('b')) {
+            detectedStaveNote.addModifier(new Accidental('b'), 0);
+        }
+
         detectedStaveNote.setStyle({
             fillStyle: isCorrect ? '#28a745' : '#dc3545',
             strokeStyle: isCorrect ? '#28a745' : '#dc3545'
@@ -235,6 +378,14 @@ function markTargetNoteCorrect(note) {
             keys: note.keys,
             duration: 'q',
         });
+
+        // Add accidental if note has sharp or flat
+        if (note.name.includes('#')) {
+            targetStaveNote.addModifier(new Accidental('#'), 0);
+        } else if (note.name.includes('b')) {
+            targetStaveNote.addModifier(new Accidental('b'), 0);
+        }
+
         targetStaveNote.setStyle({
             fillStyle: '#28a745',
             strokeStyle: '#28a745'
@@ -258,7 +409,13 @@ function markTargetNoteCorrect(note) {
 
 // Generate a new random note
 function generateNewNote() {
-    targetNote = NOTES[Math.floor(Math.random() * NOTES.length)];
+    if (!currentKeyNotes || currentKeyNotes.length === 0) {
+        console.error('No notes available in current key!');
+        return;
+    }
+
+    targetNote = currentKeyNotes[Math.floor(Math.random() * currentKeyNotes.length)];
+    console.log('Generated target note:', targetNote.name + targetNote.octave, 'Freq:', targetNote.frequency);
     lastDetectedNote = null;
     renderTargetNote(targetNote);
 
@@ -407,25 +564,73 @@ function frequencyToNote(frequency) {
     const noteIndex = (roundedNoteNum + 69) % 12;
     const octave = Math.floor((roundedNoteNum + 69) / 12);
 
-    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const noteName = noteNames[noteIndex];
+    // Get the note names in the current key signature
+    const keyNotes = KEY_SIGNATURES[currentKey];
+
+    // Map of note indices to both sharp and flat names
+    const noteOptions = {
+        0: ['C'],
+        1: ['C#', 'Db'],
+        2: ['D'],
+        3: ['D#', 'Eb'],
+        4: ['E'],
+        5: ['F'],
+        6: ['F#', 'Gb'],
+        7: ['G'],
+        8: ['G#', 'Ab'],
+        9: ['A'],
+        10: ['A#', 'Bb'],
+        11: ['B']
+    };
+
+    // Get all possible names for this pitch
+    const possibleNames = noteOptions[noteIndex];
+
+    // Find which name is in the current key signature
+    let noteName = possibleNames.find(name => keyNotes.includes(name)) || possibleNames[0];
 
     // Convert to VexFlow format
-    let keys = [`${noteName.replace('#', '')}/${octave}`];
+    let keys = [`${noteName}/${octave}`];
 
-    return {
-        name: noteName.replace('#', ''),
+    const result = {
+        name: noteName,
         octave: octave,
         keys: keys,
         frequency: frequency,
         cents: cents
     };
+
+    console.log('frequencyToNote:', frequency.toFixed(1), 'Hz ->', result.name + result.octave);
+    return result;
+}
+
+// Check if two notes are enharmonically equivalent (e.g., C# and Db)
+function areNotesEquivalent(note1, note2) {
+    console.log('Comparing:', note1.name + note1.octave, 'vs', note2.name + note2.octave);
+
+    if (note1.octave !== note2.octave) {
+        console.log('Different octaves');
+        return false;
+    }
+
+    // Since frequencyToNote() now returns the correct enharmonic spelling
+    // for the current key, we can compare by name directly
+    if (note1.name === note2.name) {
+        console.log('Names match!');
+        return true;
+    }
+
+    // Also check if they're enharmonic equivalents by frequency
+    // Use larger tolerance since detected frequency varies
+    const freqDiff = Math.abs(note1.frequency - note2.frequency);
+    console.log('Frequency difference:', freqDiff.toFixed(2), 'Hz');
+    return freqDiff < 5;
 }
 
 // Handle detected note
 function handleDetectedNote(detectedNote, frequency) {
-    const isCorrect = detectedNote.name === targetNote.name &&
-                     detectedNote.octave === targetNote.octave;
+    console.log('Target:', targetNote.name + targetNote.octave, 'Detected:', detectedNote.name + detectedNote.octave);
+    const isCorrect = areNotesEquivalent(detectedNote, targetNote);
 
     // Check if this is a different note than the last one detected
     const noteChanged = !lastDetectedNote ||
@@ -457,6 +662,7 @@ function handleDetectedNote(detectedNote, frequency) {
                 generateNewNote();
             }, 500); // Small delay to show the green match
         } else {
+            incrementWrongCount();
             updateFeedback('incorrect', `Not quite. Try again!`);
         }
     }
