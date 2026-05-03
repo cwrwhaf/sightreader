@@ -162,10 +162,10 @@ function renderDetectedNote(targetNote, detectedNote) {
 
         if (!detectedNote) return;
 
-        // Create fresh Stave objects for positioning - offset x and further right for detected note
-        const freshTrebleStave = new Stave(320, 40, 270);
+        // Create fresh Stave objects for positioning - same position as target note
+        const freshTrebleStave = new Stave(90, 40, 500);
         freshTrebleStave.setContext(context);
-        const freshBassStave = new Stave(320, 180, 270);
+        const freshBassStave = new Stave(90, 180, 500);
         freshBassStave.setContext(context);
 
         const detectedClef = getNoteClef(detectedNote.octave);
@@ -185,7 +185,7 @@ function renderDetectedNote(targetNote, detectedNote) {
         // Format and draw using Voice
         const voice = new Voice({ num_beats: 4, beat_value: 4 });
         voice.addTickables([detectedStaveNote]);
-        new Formatter().joinVoices([voice]).format([voice], 220);
+        new Formatter().joinVoices([voice]).format([voice], 450);
         voice.draw(context, detectedStaveRef);
 
         // Add detected note label
