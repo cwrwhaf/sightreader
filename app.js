@@ -102,7 +102,7 @@ let stavesChildCount = 0; // Number of SVG children after drawing staves
 let targetNoteChildCount = 0; // Number of SVG children after drawing target note
 let currentNoteX = 90; // Starting x position for notes
 const noteWidth = 80; // Width allocated per note
-const staveEndX = 580; // End of the stave
+const staveEndX = 780; // End of the stave
 let lastTargetNoteChildCount = 0; // Track where the last target note ends
 
 // Initialize
@@ -219,11 +219,11 @@ function redrawStaves() {
 
     try {
         // Draw treble clef stave with key signature (always show it)
-        trebleStave = new Stave(10, 40, 580);
+        trebleStave = new Stave(10, 40, 780);
         trebleStave.addClef('treble').addKeySignature(currentKey).setContext(context).draw();
 
         // Draw bass clef stave with key signature (always show it)
-        bassStave = new Stave(10, 180, 580);
+        bassStave = new Stave(10, 180, 780);
         bassStave.addClef('bass').addKeySignature(currentKey).setContext(context).draw();
 
 
@@ -234,10 +234,10 @@ function redrawStaves() {
     } catch (error) {
         console.error('Error drawing staves with key signature:', currentKey, error);
         // Fallback: draw without key signature
-        trebleStave = new Stave(10, 40, 580);
+        trebleStave = new Stave(10, 40, 780);
         trebleStave.addClef('treble').setContext(context).draw();
 
-        bassStave = new Stave(10, 180, 580);
+        bassStave = new Stave(10, 180, 780);
         bassStave.addClef('bass').setContext(context).draw();
 
         if (svg) {
@@ -252,7 +252,7 @@ function initializeStaves() {
 
     // Create renderer
     renderer = new Renderer(notationDiv, Renderer.Backends.SVG);
-    renderer.resize(600, 350);
+    renderer.resize(800, 400);
     context = renderer.getContext();
 
     try {
