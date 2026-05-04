@@ -226,17 +226,6 @@ function redrawStaves() {
         bassStave = new Stave(10, 180, 580);
         bassStave.addClef('bass').addKeySignature(currentKey).setContext(context).draw();
 
-        // Add labels
-        context.fillStyle = '#667eea';
-        context.font = 'bold 14px Arial';
-        if (!keyDetectionMode) {
-            context.fillText('Target', 20, 25);
-        } else {
-            context.fillText('Identify Key', 20, 25);
-        }
-
-        context.fillStyle = '#333';
-        context.fillText('You Played', 200, 25);
 
         // Update child count
         if (svg) {
