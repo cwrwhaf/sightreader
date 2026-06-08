@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Don't generate a note yet - wait for user to identify the key
     updateScoreDisplay();
     updateKeyDisplay();
-    updateFeedback('idle', 'What key is this? Click "Start Listening" and play any note from this key');
+    updateFeedback('idle', 'Look at the key signature — what key is this? Click "Start Listening" and play the tonic note');
 
     document.getElementById('startBtn').addEventListener('click', toggleListening);
     document.getElementById('newNoteBtn').addEventListener('click', generateNewNote);
@@ -288,9 +288,9 @@ function renderTargetNote(note, color = '#667eea') {
 
             // Update feedback
             if (isListening) {
-                updateFeedback('listening', 'Page complete! New key - play any note from this key');
+                updateFeedback('listening', 'Page complete! New key — play the tonic to identify it!');
             } else {
-                updateFeedback('idle', 'Page complete! What is this new key? Click "Start Listening"');
+                updateFeedback('idle', 'Page complete! Look at the key signature and play its tonic note');
             }
 
             return; // Don't render a note yet
@@ -478,7 +478,7 @@ function markTargetNoteCorrect(note) {
 function generateNewNote() {
     // Don't generate notes in key detection mode
     if (keyDetectionMode) {
-        updateFeedback('idle', 'Please identify the key first by playing a note from this key');
+        updateFeedback('idle', 'Identify the key first — play the tonic note of the key signature');
         return;
     }
 
@@ -512,7 +512,7 @@ async function toggleListening() {
             btn.classList.add('listening');
 
             if (keyDetectionMode) {
-                updateFeedback('listening', 'Listening... play any note from the key!');
+                updateFeedback('listening', 'Listening... play the tonic note of this key!');
             } else {
                 updateFeedback('listening', 'Listening... play the note!');
             }
@@ -526,7 +526,7 @@ async function toggleListening() {
         btn.classList.remove('listening');
 
         if (keyDetectionMode) {
-            updateFeedback('idle', 'What key is this? Click "Start Listening" and play a note from this key');
+            updateFeedback('idle', 'Look at the key signature — play the tonic note to identify the key');
         } else if (targetNote) {
             updateFeedback('idle', `Play or sing: ${targetNote.name}${targetNote.octave}`);
         } else {
@@ -724,12 +724,11 @@ function handleDetectedNote(detectedNote, frequency) {
         // Show the detected note on the staff
         renderDetectedNote(null, detectedNote);
 
-        // Check if the detected note belongs to the current key
-        const keyNotes = KEY_SIGNATURES[currentKey];
-        const isCorrectKey = keyNotes.includes(detectedNote.name);
+        // Check if the detected note is the tonic of the current key
+        const isCorrectKey = detectedNote.name === currentKey;
 
         if (isCorrectKey) {
-            // Correct! User identified the key
+            // Correct! User identified the key by playing the tonic
             updateFeedback('correct', `Correct! This is ${currentKey} major! Get ready for the first note...`);
 
             // Exit key detection mode
@@ -747,9 +746,9 @@ function handleDetectedNote(detectedNote, frequency) {
                 updateFeedback('listening', 'New note! Can you play it?');
             }, 2000);
         } else {
-            // Wrong note - not in this key
+            // Wrong note - not the tonic
             incrementWrongCount();
-            updateFeedback('incorrect', `${detectedNote.name} is not in this key. Try again!`);
+            updateFeedback('incorrect', `${detectedNote.name} is not the tonic. Try the root note!`);
         }
 
         return;
