@@ -76,12 +76,28 @@ const KEY_SIGNATURES = {
 };
 
 const KEY_NAMES = Object.keys(KEY_SIGNATURES);
+const TOTAL_NOTES = 12;
+
+const INSTRUMENTS = {
+    piano:  { label: '88-Key Piano', minFreq: 27.5,  maxFreq: 4200 }, // A0–C8
+    guitar: { label: 'Guitar',       minFreq: 82.0,  maxFreq: 1400 }, // E2–D6
+};
+let currentInstrument = 'piano';
+
+function filterNotesByInstrument(notes) {
+    const { minFreq, maxFreq } = INSTRUMENTS[currentInstrument];
+    return notes.filter(n => n.frequency >= minFreq && n.frequency <= maxFreq);
+}
+
 let currentKey = 'C';
 let currentKeyNotes = [];
 
 // Score tracking
 let wrongNoteCount = 0;
-let bestScore = null;
+let notesPlayed = 0;
+let bestScore = localStorage.getItem('sightreader_best') !== null
+    ? parseInt(localStorage.getItem('sightreader_best'))
+    : null;
 
 // App state
 let targetNote = null;
@@ -102,7 +118,7 @@ let stavesChildCount = 0; // Number of SVG children after drawing staves
 let targetNoteChildCount = 0; // Number of SVG children after drawing target note
 let currentNoteX = 90; // Starting x position for notes
 const noteWidth = 80; // Width allocated per note
-const staveEndX = 780; // End of the stave
+let staveEndX = 790; // Right edge of current stave (10 + 780)
 let lastTargetNoteChildCount = 0; // Track where the last target note ends
 
 // Initialize
@@ -119,6 +135,20 @@ document.addEventListener('DOMContentLoaded', () => {
     updateFeedback('idle', 'Look at the key signature — what key is this? Click "Start Listening" and play the tonic note');
 
     document.getElementById('startBtn').addEventListener('click', toggleListening);
+    document.getElementById('playAgainBtn').addEventListener('click', startNewGame);
+
+    document.querySelectorAll('.inst-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentInstrument = btn.dataset.inst;
+            document.querySelectorAll('.inst-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            // Rebuild note pool immediately if we're mid-game
+            if (!keyDetectionMode) {
+                const keyNotes = KEY_SIGNATURES[currentKey];
+                currentKeyNotes = filterNotesByInstrument(ALL_NOTES.filter(n => keyNotes.includes(n.name)));
+            }
+        });
+    });
 });
 
 // Helper to determine which clef a note belongs to
@@ -129,7 +159,8 @@ function getNoteClef(octave) {
 // Update score display
 function updateScoreDisplay() {
     document.getElementById('currentScore').textContent = wrongNoteCount;
-    document.getElementById('bestScore').textContent = bestScore === null ? '-' : bestScore;
+    document.getElementById('bestScore').textContent = bestScore === null ? '—' : bestScore;
+    document.getElementById('progressDisplay').textContent = `${notesPlayed} / ${TOTAL_NOTES}`;
 }
 
 // Update key display
@@ -142,14 +173,48 @@ function updateKeyDisplay() {
     }
 }
 
-// Reset score for new page
-function resetScore() {
-    // Update best score if current is better (lower)
+// End the game and show score screen
+function endGame() {
+    if (isListening) {
+        stopListening();
+        document.getElementById('startBtn').textContent = 'Start Listening';
+        document.getElementById('startBtn').classList.remove('listening');
+    }
+
+    const accuracy = Math.round((TOTAL_NOTES / (TOTAL_NOTES + wrongNoteCount)) * 100);
+
     if (bestScore === null || wrongNoteCount < bestScore) {
         bestScore = wrongNoteCount;
+        localStorage.setItem('sightreader_best', bestScore);
     }
-    wrongNoteCount = 0;
+
+    document.getElementById('gameOverKey').textContent = `Key of ${currentKey} major`;
+    document.getElementById('finalWrong').textContent = wrongNoteCount;
+    document.getElementById('finalAccuracy').textContent = accuracy + '%';
+    document.getElementById('finalBest').textContent = bestScore === null ? '—' : bestScore;
+    document.getElementById('gameOver').style.display = 'flex';
     updateScoreDisplay();
+}
+
+// Reset and start a new game
+function startNewGame() {
+    document.getElementById('gameOver').style.display = 'none';
+
+    wrongNoteCount = 0;
+    notesPlayed = 0;
+    targetNote = null;
+    lastDetectedNote = null;
+    currentNoteX = 90;
+    staveEndX = 790;
+    keyDetectionMode = true;
+
+    selectNewKey();
+    renderer.resize(800, 400);
+    redrawStaves();
+    updateKeyDisplay();
+    updateScoreDisplay();
+    updateFeedback('idle', 'Look at the key signature — what key is this? Click "Start Listening" and play the tonic note');
+    document.getElementById('detectedNote').textContent = '';
 }
 
 // Increment wrong note count
@@ -182,11 +247,8 @@ function setKeyFromNote(note) {
     const newKey = possibleKeys[Math.floor(Math.random() * possibleKeys.length)];
     currentKey = newKey;
 
-    // Filter notes from ALL_NOTES that belong to this key
     const keyNotes = KEY_SIGNATURES[currentKey];
-    currentKeyNotes = ALL_NOTES.filter(n =>
-        keyNotes.includes(n.name)
-    );
+    currentKeyNotes = filterNotesByInstrument(ALL_NOTES.filter(n => keyNotes.includes(n.name)));
 
     console.log(`Key set to: ${currentKey} major (from note ${note.name}${note.octave})`);
     console.log(`Available notes: ${currentKeyNotes.length}`);
@@ -196,11 +258,8 @@ function selectNewKey() {
     const newKey = KEY_NAMES[Math.floor(Math.random() * KEY_NAMES.length)];
     currentKey = newKey;
 
-    // Filter notes from ALL_NOTES that belong to this key
     const keyNotes = KEY_SIGNATURES[currentKey];
-    currentKeyNotes = ALL_NOTES.filter(note =>
-        keyNotes.includes(note.name)
-    );
+    currentKeyNotes = filterNotesByInstrument(ALL_NOTES.filter(note => keyNotes.includes(note.name)));
 
     console.log(`New key: ${currentKey} major`);
     console.log(`Available notes: ${currentKeyNotes.length}`);
@@ -245,6 +304,26 @@ function redrawStaves() {
     }
 }
 
+// Extend the stave to the right when it fills up
+function extendStaves() {
+    const CONTINUATION_WIDTH = 790;
+    const startX = staveEndX;
+
+    const newTreble = new Stave(startX, 40, CONTINUATION_WIDTH);
+    newTreble.setContext(context).draw();
+
+    const newBass = new Stave(startX, 180, CONTINUATION_WIDTH);
+    newBass.setContext(context).draw();
+
+    staveEndX = startX + CONTINUATION_WIDTH;
+    currentNoteX = startX + 20;
+
+    renderer.resize(staveEndX + 10, 400);
+
+    const notationDiv = document.getElementById('notation');
+    notationDiv.scrollLeft = notationDiv.scrollWidth;
+}
+
 // Initialize staves once - only called on page load
 function initializeStaves() {
     const notationDiv = document.getElementById('notation');
@@ -267,32 +346,9 @@ function renderTargetNote(note, color = '#667eea') {
         const notationDiv = document.getElementById('notation');
         const svg = notationDiv.querySelector('svg');
 
-        // Check if we need to clear and reset (stave is full)
+        // Extend the stave when it fills up
         if (currentNoteX + noteWidth > staveEndX) {
-            currentNoteX = 90; // Reset to start
-            // Reset score and go back to key detection mode
-            resetScore();
-            keyDetectionMode = true;
-            targetNote = null;
-
-            // Select a new random key
-            selectNewKey();
-            console.log('Page full - new key selected:', currentKey);
-
-            // Update key display to show "?"
-            updateKeyDisplay();
-
-            // Redraw staves with new key signature
-            redrawStaves();
-
-            // Update feedback
-            if (isListening) {
-                updateFeedback('listening', 'Page complete! New key — play the tonic to identify it!');
-            } else {
-                updateFeedback('idle', 'Page complete! Look at the key signature and play its tonic note');
-            }
-
-            return; // Don't render a note yet
+            extendStaves();
         }
 
         // Store where this target note starts
@@ -341,6 +397,10 @@ function renderTargetNote(note, color = '#667eea') {
 
         // Move to next position for next note
         currentNoteX += noteWidth;
+
+        // Scroll to keep the newly rendered note comfortably in view
+        const noteX = currentNoteX - noteWidth;
+        notationDiv.scrollLeft = Math.max(0, noteX - notationDiv.clientWidth / 2);
     } catch (error) {
         console.error('Error rendering target note:', error);
     }
@@ -771,11 +831,18 @@ function handleDetectedNote(detectedNote, frequency) {
             : ` (${Math.abs(detectedNote.cents).toFixed(0)} cents ${detectedNote.cents > 0 ? 'sharp' : 'flat'})`;
         updateFeedback('correct', `Correct! The note was ${detectedNote.name}${detectedNote.octave}${centsMessage}`);
 
-        // Mark target note as correct (turn green) and generate new note
+        notesPlayed++;
+        updateScoreDisplay();
+
+        // Mark target note as correct (turn green), then advance or end
         setTimeout(() => {
             markTargetNoteCorrect(targetNote);
-            generateNewNote();
-        }, 500); // Small delay to show the green match
+            if (notesPlayed >= TOTAL_NOTES) {
+                endGame();
+            } else {
+                generateNewNote();
+            }
+        }, 500);
     } else {
         incrementWrongCount();
         updateFeedback('incorrect', `Not quite. Try again!`);

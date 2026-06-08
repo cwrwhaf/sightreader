@@ -210,6 +210,121 @@
             font-weight: 500;
         }
 
+        .inst-selector {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .inst-selector-label {
+            font-size: 0.6em;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--slate);
+            white-space: nowrap;
+        }
+
+        .inst-btns {
+            display: flex;
+            gap: 2px;
+            background: var(--charcoal);
+            border: 2px solid var(--charcoal);
+        }
+
+        .inst-btn {
+            background: var(--paper);
+            color: var(--graphite);
+            border: none;
+            padding: 7px 16px;
+            font-size: 0.6em;
+            cursor: pointer;
+            font-weight: 500;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .inst-btn:hover {
+            background: var(--fog);
+        }
+
+        .inst-btn.active {
+            background: var(--charcoal);
+            color: var(--paper);
+        }
+
+        .inst-btn.active:hover {
+            background: var(--charcoal);
+            color: var(--paper);
+        }
+
+        .game-over-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(250, 248, 245, 0.97);
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+
+        .game-over-panel {
+            text-align: center;
+            padding: 48px 40px;
+        }
+
+        .game-over-title {
+            font-family: 'DM Serif Display', Georgia, serif;
+            font-size: 2em;
+            font-weight: 400;
+            color: var(--charcoal);
+            letter-spacing: -0.03em;
+            margin-bottom: 6px;
+        }
+
+        .game-over-key {
+            font-size: 0.7em;
+            color: var(--amber);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 40px;
+        }
+
+        .game-over-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 48px;
+            border-bottom: 1px solid var(--fog);
+            padding-bottom: 16px;
+        }
+
+        .stat-label {
+            font-size: 0.65em;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--slate);
+        }
+
+        .stat-value {
+            font-family: 'DM Serif Display', serif;
+            font-size: 1.6em;
+            color: var(--charcoal);
+            letter-spacing: -0.02em;
+        }
+
+        .stat-value.best {
+            color: var(--green);
+        }
+
         @media (max-width: 768px) {
             body {
                 padding: 24px 16px;
@@ -272,6 +387,14 @@
             Click "Start Listening" to begin, then play the note shown above
         </div>
 
+        <div class="inst-selector">
+            <span class="inst-selector-label">Instrument</span>
+            <div class="inst-btns">
+                <button class="inst-btn active" data-inst="piano">88-Key Piano</button>
+                <button class="inst-btn" data-inst="guitar">Guitar</button>
+            </div>
+        </div>
+
         <div class="controls">
             <button id="startBtn">Start Listening</button>
         </div>
@@ -283,15 +406,41 @@
                     <div class="score-value" id="currentKeyDisplay">?</div>
                 </div>
                 <div class="score-item">
-                    <div class="score-label">Wrong Notes</div>
+                    <div class="score-label">Progress</div>
+                    <div class="score-value" id="progressDisplay">0 / 12</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-label">Mistakes</div>
                     <div class="score-value" id="currentScore">0</div>
                 </div>
                 <div class="score-item">
-                    <div class="score-label">Best Score</div>
-                    <div class="score-value best" id="bestScore">-</div>
+                    <div class="score-label">Best</div>
+                    <div class="score-value best" id="bestScore">—</div>
                 </div>
             </div>
             <div id="notation"></div>
+
+            <div id="gameOver" class="game-over-overlay">
+                <div class="game-over-panel">
+                    <div class="game-over-title">Round complete</div>
+                    <div class="game-over-key" id="gameOverKey">Key of C major</div>
+                    <div class="game-over-stats">
+                        <div class="stat-row">
+                            <span class="stat-label">Mistakes</span>
+                            <span class="stat-value" id="finalWrong">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Accuracy</span>
+                            <span class="stat-value" id="finalAccuracy">100%</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Best</span>
+                            <span class="stat-value best" id="finalBest">—</span>
+                        </div>
+                    </div>
+                    <button id="playAgainBtn">Play Again</button>
+                </div>
+            </div>
         </div>
 
         <div class="detected-note" id="detectedNote"></div>
