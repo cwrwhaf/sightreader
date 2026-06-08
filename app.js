@@ -119,7 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateFeedback('idle', 'Look at the key signature — what key is this? Click "Start Listening" and play the tonic note');
 
     document.getElementById('startBtn').addEventListener('click', toggleListening);
-    document.getElementById('newNoteBtn').addEventListener('click', generateNewNote);
 });
 
 // Helper to determine which clef a note belongs to
